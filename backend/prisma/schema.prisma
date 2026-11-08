@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String      @id @default(uuid())
+  login           String      @unique
+  password        String
+  role            String      @default("DRIVER") // "DRIVER" | "DISPATCHER"
+  fullName        String
+  phone           String      @unique // E.164: +7XXXXXXXXXX
+  isBlocked       Boolean     @default(false)
+  issuedPassword  String?     // Выданный диспетчером пароль для реестра доступов
+  
+  // Автозвонки и доступность водителя
+  callConsent     Boolean     @default(false) // Согласие на автоматические звонки
+  callConsentAt   DateTime?                   // Дата/время получения согласия
+  workStatus      String      @default("FREE") // "FREE" (свободен) | "IN_TRIP" (в рейсе) | "RESTING" (отдыхает)
+  telegramChatId  String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  vehicle         Vehicle?
+  assignedCargos  Cargo[]     @relation("DriverAssignedCargos")
+  
+  driverRequests  DriverCargoRequest[]
+  callLogsAsDriver     CallLog[] @relation("DriverCalls")
+  callLogsAsDispatcher CallLog[] @relation("DispatcherCalls")
+  
+  callAttempts    CallAttempt[]
+  
+  complaintsAuthored      Complaint[] @relation("ComplaintsAuthored")
+  complaintsAgainstDriver Complaint[] @relation("ComplaintsAgainstDriver")
+  
+  reviewsAuthored   Review[]  @relation("ReviewsAuthored")
+  reviewsReceived   Review[]  @relation("ReviewsReceived")
+  
+  rateChanges       RateChangeHistory[]
+  auditLogs         AuditLog[]
+}
+
+model Vehicle {
+  id            String   @id @default(uuid())
+  driverId      String   @unique
+  driver        User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  capacityTons  Float
+  bodyType      String   // Тент, Рефрижератор, Борт, Контейнеровоз, Самосвал, Изотермический, Цельнометаллический, Цистерна
+  currentCity   String   // Алматы, Астана, Шымкент, etc.
+  plateNumber   String?
+  model         String?
+  updatedAt     DateTime @updatedAt
+}
+
+model Cargo {
+  id              String      @id @default(uuid())
+  cargoNumber     Int         @unique
+  originCity      String
+  destinationCity String
+  weightTons      Float
+  bodyType        String
+  loadingDate     DateTime
+  rateKzt         Int
+  rateStatus      String      @default("CONFIRMED") // "CONFIRMED" (Подтверждена), "PENDING" (На согласовании)
+  status          String      @default("OPEN")      // "OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"
+  
+  // Автозвонки и резервирование
+  autoCallEnabled Boolean     @default(true)
+  reservedDriverId String?
+  reservedUntil   DateTime?
+  
+  customerName    String
+  customerPhone   String
+  customerCompany String?
+  description     String?
+  
+  assignedDriverId String?
+  assignedDriver   User?       @relation("DriverAssignedCargos", fields: [assignedDriverId], references: [id])
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  rateChanges     RateChangeHistory[]
+  callLogs        CallLog[]
+  callAttempts    CallAttempt[]
+  complaints      Complaint[]
+  reviews         Review[]
+  driverRequests  DriverCargoRequest[]
+}
+
+model CallAttempt {
+  id               String    @id @default(uuid())
+  loadId           String
+  cargo            Cargo     @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  driverId         String
+  driver           User      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  provider         String    // "twilio", "zadarma", "mock"
+  providerCallId   String?
+  status           String    // "queued", "dialing", "ringing", "answered", "accepted", "declined", "no_answer", "busy", "failed"
+  attemptNumber    Int       @default(1)
+  
+  cargoCreatedAt   DateTime
+  callInitiatedAt  DateTime?
+  latencyMs        Int?      // Задержка от создания груза до отправки звонка (целевое < 3000 мс)
+  
+  startedAt        DateTime?
+  answeredAt       DateTime?
+  endedAt          DateTime?
+  dtmfKey          String?   // "1", "2", "9"
+  error            String?
+  fallbackUsed     Boolean   @default(false)
+  
+  createdAt        DateTime  @default(now())
+
+  @@index([loadId, driverId, attemptNumber])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique // "AUTO_CALL_ENABLED", "ESCALATION_MINUTES", "MAX_CALLS_PER_HOUR"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model RateChangeHistory {
+  id          String   @id @default(uuid())
+  cargoId     String
+  cargo       Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  oldRate     Int
+  newRate     Int
+  reason      String
+  changedById String
+  changedBy   User     @relation(fields: [changedById], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model DriverCargoRequest {
+  id        String   @id @default(uuid())
+  cargoId   String
+  cargo     Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  driverId  String
+  driver    User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  status    String   @default("PENDING") // "PENDING", "ACCEPTED", "DECLINED"
+  createdAt DateTime @default(now())
+}
+
+model CallLog {
+  id           String   @id @default(uuid())
+  cargoId      String
+  cargo        Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  driverId     String
+  driver       User     @relation("DriverCalls", fields: [driverId], references: [id], onDelete: Cascade)
+  dispatcherId String
+  dispatcher   User     @relation("DispatcherCalls", fields: [dispatcherId], references: [id])
+  outcome      String   // "AGREED" (согласен), "DECLINED" (отказался), "NO_ANSWER" (не ответил)
+  comment      String?
+  createdAt    DateTime @default(now())
+}
+
+model Complaint {
+  id             String    @id @default(uuid())
+  authorId       String
+  author         User      @relation("ComplaintsAuthored", fields: [authorId], references: [id])
+  targetDriverId String?
+  targetDriver   User?     @relation("ComplaintsAgainstDriver", fields: [targetDriverId], references: [id])
+  targetCargoId  String?
+  targetCargo    Cargo?    @relation(fields: [targetCargoId], references: [id])
+  reason         String    // "Срыв погрузки", "Несоответствие ставки", "Опоздание", "Грубость", "Другое"
+  comment        String
+  status         String    @default("NEW") // "NEW", "IN_PROGRESS", "RESOLVED"
+  resolution     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Review {
+  id           String   @id @default(uuid())
+  cargoId      String
+  cargo        Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User     @relation("ReviewsAuthored", fields: [authorId], references: [id])
+  targetUserId String?
+  targetUser   User?    @relation("ReviewsReceived", fields: [targetUserId], references: [id])
+  rating       Int      // 1 to 5
+  comment      String?
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String
+  ip        String?
+  createdAt DateTime @default(now())
+}

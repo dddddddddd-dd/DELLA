@@ -1,0 +1,10 @@
+{
+  "name": "della-root",
+  "private": true,
+  "scripts": {
+    "start": "cmd /c START.bat",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev"
+  }
+}
+

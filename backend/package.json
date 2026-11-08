@@ -1,0 +1,54 @@
+{
+  "name": "della-backend",
+  "version": "1.0.0",
+  "description": "DELLA — Сервис подбора грузов для водителей-грузоперевозчиков (Казахстан)",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test:autocall": "tsx test-autocall-suite.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:use-sqlite": "tsx scripts/switch-db.ts sqlite",
+    "db:use-postgres": "tsx scripts/switch-db.ts postgres"
+  },
+  "keywords": [
+    "logistics",
+    "cargo",
+    "kazakhstan",
+    "della",
+    "fastify",
+    "express",
+    "prisma"
+  ],
+  "author": "DELLA Team",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^6.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^10.4.0",
+    "pino-pretty": "^13.2.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.8.7",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
