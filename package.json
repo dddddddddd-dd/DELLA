@@ -1,8 +1,10 @@
 {
   "name": "della-root",
   "private": true,
+  "type": "module",
   "scripts": {
-    "start": "cmd /c START.bat",
+    "dev": "node dev.js",
+    "start": "node dev.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev"
   }
